@@ -11,7 +11,7 @@ For a public repository, `.env.example` uses placeholder secrets only.
 - Infra services run in this repository.
 - Application repositories attach to the external Docker network `infra_default`.
 - Applications connect to infra by container hostname, not `localhost`.
-- DB creation and user creation happen in `initdb/01_create_databases.sh`.
+- DB creation and user creation happen in `initdb/mysql/01_create_databases.sh` (MySQL) and `initdb/mongo/02_mongo_init.js` (MongoDB).
 - Schema creation stays in each application repository migration flow.
 
 ## Services
@@ -21,18 +21,25 @@ For a public repository, `.env.example` uses placeholder secrets only.
 | MySQL | `local-mysql` | `3306` |
 | Redis | `local-redis` | `6379` |
 | RabbitMQ | `local-rabbitmq` | `5672`, `15672` |
+| Redpanda | `local-redpanda` | `9092` (Kafka), `9644` (Admin) |
+| MongoDB | `local-mongodb` | `27017` |
 
 ## Files
 
 - `docker-compose.yml`: shared infra services
 - `Makefile`: common startup and teardown commands
 - `.env.example`: infra environment variables
-- `initdb/01_create_databases.sh`: database and user bootstrap
+- `initdb/mysql/01_create_databases.sh`: MySQL database and user bootstrap
+- `initdb/mongo/02_mongo_init.js`: MongoDB database and user bootstrap
 
 ## Bootstrapped databases
 
+### MySQL
 - `blog_db` with shared development user `devuser`
 - `hr_db` with shared development user `devuser`
+
+### MongoDB
+- `blog` with shared development user `devuser`
 
 ## Quick start
 
@@ -83,6 +90,24 @@ Start MySQL and RabbitMQ:
 make up-mysql-rabbitmq
 ```
 
+Start Redpanda only:
+
+```bash
+make up-redpanda
+```
+
+Start MongoDB only:
+
+```bash
+make up-mongodb
+```
+
+Start Redpanda and MongoDB:
+
+```bash
+make up-redpanda-mongodb
+```
+
 Start all shared infra services:
 
 ```bash
@@ -119,13 +144,37 @@ Stop MySQL and RabbitMQ:
 make stop-mysql-rabbitmq
 ```
 
+Stop Redpanda only:
+
+```bash
+make stop-redpanda
+```
+
+Stop MongoDB only:
+
+```bash
+make stop-mongodb
+```
+
+Stop Redpanda and MongoDB:
+
+```bash
+make stop-redpanda-mongodb
+```
+
 Stop all running infra containers without removing them:
 
 ```bash
 make stop-full
 ```
 
-Stop containers and keep data:
+Stop containers and keep data (all services):
+
+```bash
+make down-full
+```
+
+Stop all containers including unnamed ones and keep data:
 
 ```bash
 make down
@@ -137,7 +186,7 @@ Stop containers and delete volumes:
 make down-clean
 ```
 
-Use `make down-clean` only when you intentionally want to delete local data and re-bootstrap MySQL from scratch.
+Use `make down-clean` only when you intentionally want to delete local data and re-bootstrap from scratch.
 
 ## Add a new project database
 
@@ -169,9 +218,15 @@ HR_DB_NAME=hr_db
 
 DEV_DB_USER=devuser
 DEV_DB_PASSWORD=changeme
+
+REDPANDA_MEMORY=512M
+
+MONGO_ROOT_USER=admin
+MONGO_ROOT_PASSWORD=admin
+MONGO_CACHE_SIZE=0.25
 ```
 
-`MYSQL_ROOT_PASSWORD` is used for container bootstrap.
+`MYSQL_ROOT_PASSWORD` and `MONGO_ROOT_PASSWORD` are used for container bootstrap.
 Replace placeholder values in your local `.env` before starting the stack.
 Application repositories must use DB credentials that match this local `.env`.
 

@@ -123,7 +123,7 @@ services:
       - mongodb_data:/data/db
       - ./initdb/mongo:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      test: ['CMD', 'mongosh', '--username', '${MONGO_ROOT_USER:-admin}', '--password', '${MONGO_ROOT_PASSWORD:-admin}', '--eval', 'db.adminCommand("ping")']
       interval: 10s
       timeout: 5s
       retries: 5
