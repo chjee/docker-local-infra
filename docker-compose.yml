@@ -11,7 +11,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./initdb:/docker-entrypoint-initdb.d
+      - ./initdb/mysql:/docker-entrypoint-initdb.d
     healthcheck:
       test:
         [
@@ -72,10 +72,71 @@ services:
     networks:
       - infra_default
 
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: local-redpanda
+    restart: unless-stopped
+    profiles: ['redpanda', 'full']
+    ports:
+      - '9092:9092'
+      - '9644:9644'
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - ${REDPANDA_MEMORY:-512M}
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://localhost:9092
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ['CMD', 'rpk', 'cluster', 'info']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - infra_default
+
+  mongodb:
+    image: mongo:8.0
+    container_name: local-mongodb
+    restart: unless-stopped
+    profiles: ['mongodb', 'full']
+    ports:
+      - '27017:27017'
+    command: mongod --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE:-0.25}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin}
+    volumes:
+      - mongodb_data:/data/db
+      - ./initdb/mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - infra_default
+
 volumes:
   mysql_data:
   redis_data:
   rabbitmq_data:
+  redpanda_data:
+  mongodb_data:
 
 networks:
   infra_default:
