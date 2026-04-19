@@ -73,7 +73,7 @@ services:
       - infra_default
 
   redpanda:
-    image: redpandadata/redpanda:latest
+    image: redpandadata/redpanda:v25.2.7
     container_name: local-redpanda
     restart: unless-stopped
     profiles: ['redpanda', 'full']
@@ -109,7 +109,7 @@ services:
       - infra_default
 
   mongodb:
-    image: mongo:8.0
+    image: mongo:8.2
     container_name: local-mongodb
     restart: unless-stopped
     profiles: ['mongodb', 'full']
