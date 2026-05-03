@@ -70,6 +70,8 @@ Run static and Compose configuration checks:
 make check
 ```
 
+Requires Docker Compose, Node.js, Bash, and shellcheck.
+
 Start MySQL only:
 
 ```bash
