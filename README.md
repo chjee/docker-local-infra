@@ -64,6 +64,12 @@ make up-full
 
 ## Start and stop
 
+Run static and Compose configuration checks:
+
+```bash
+make check
+```
+
 Start MySQL only:
 
 ```bash
