@@ -11,6 +11,7 @@ For a public repository, `.env.example` uses placeholder secrets only.
 - Infra services run in this repository.
 - Application repositories attach to the external Docker network `infra_default`.
 - Applications connect to infra by container hostname, not `localhost`.
+- The default container hostnames and network name are the app-facing API. If you override them in `.env`, update each application repository to match.
 - DB creation and user creation happen in `initdb/mysql/01_create_databases.sh` (MySQL) and `initdb/mongo/02_mongo_init.js` (MongoDB).
 - Schema creation stays in each application repository migration flow.
 
@@ -40,6 +41,9 @@ For a public repository, `.env.example` uses placeholder secrets only.
 
 ### MongoDB
 - `blog` with shared development user `devuser`
+
+MongoDB uses the same shared development user and password variables as MySQL:
+`DEV_DB_USER` and `DEV_DB_PASSWORD`.
 
 ## Quick start
 
@@ -188,18 +192,74 @@ make down-clean
 
 Use `make down-clean` only when you intentionally want to delete local data and re-bootstrap from scratch.
 
+## Portability and overrides
+
+The default service names and network name are stable for application repositories:
+
+```env
+MYSQL_CONTAINER_NAME=local-mysql
+REDIS_CONTAINER_NAME=local-redis
+RABBITMQ_CONTAINER_NAME=local-rabbitmq
+REDPANDA_CONTAINER_NAME=local-redpanda
+MONGO_CONTAINER_NAME=local-mongodb
+INFRA_NETWORK_NAME=infra_default
+```
+
+If another machine already uses one of the default host ports, override only the host-side port in `.env`:
+
+```env
+MYSQL_PORT=13306
+REDIS_PORT=16379
+RABBITMQ_PORT=15673
+RABBITMQ_MANAGEMENT_PORT=25672
+REDPANDA_KAFKA_PORT=19092
+REDPANDA_ADMIN_PORT=19644
+MONGO_PORT=37017
+```
+
+Application containers still connect to the container port through the Docker network, for example `local-mysql:3306`.
+
+Redpanda defaults to advertising the configured Docker hostname for application containers:
+
+```env
+REDPANDA_CONTAINER_NAME=local-redpanda
+# Effective default: PLAINTEXT://${REDPANDA_CONTAINER_NAME}:9092
+```
+
+For host-machine Kafka clients that connect through the published port, override it locally:
+
+```env
+REDPANDA_ADVERTISE_KAFKA_ADDR=PLAINTEXT://localhost:9092
+```
+
+## Volumes and bootstrap
+
+MySQL and MongoDB init scripts run only when their data directory is empty.
+Changing `.env` later does not automatically update users, passwords, or databases stored in existing named volumes.
+
+Use one of these paths:
+
+- Fresh local data: run `make down-clean` only when you intentionally want to delete all local infra volumes and re-bootstrap.
+- Existing local data: apply a manual migration or re-run a targeted bootstrap command against the running container.
+
+MongoDB previously used a hardcoded app password in `initdb/mongo/02_mongo_init.js`.
+New fresh volumes use `DEV_DB_PASSWORD` from `.env`; existing `mongodb_data` volumes keep their old user credentials until migrated or reset.
+
 ## Add a new project database
 
 1. Add new DB/user variables to `.env.example` and your local `.env`.
-2. Extend `initdb/01_create_databases.sh` with the new bootstrap block.
+2. Extend `initdb/mysql/01_create_databases.sh` with the new bootstrap block.
 3. Re-apply the bootstrap script to the running MySQL container.
 4. Update the target application repository environment variables.
 5. Run that repository's migrations.
 
 ```bash
-docker cp .env local-mysql:/tmp/infra.env
-docker exec local-mysql sh -c 'set -a; . /tmp/infra.env; set +a; exec /docker-entrypoint-initdb.d/01_create_databases.sh'
-docker exec local-mysql rm -f /tmp/infra.env
+set -a
+. ./.env
+set +a
+docker cp .env "${MYSQL_CONTAINER_NAME:-local-mysql}:/tmp/infra.env"
+docker exec "${MYSQL_CONTAINER_NAME:-local-mysql}" sh -c 'set -a; . /tmp/infra.env; set +a; exec /docker-entrypoint-initdb.d/01_create_databases.sh'
+docker exec "${MYSQL_CONTAINER_NAME:-local-mysql}" rm -f /tmp/infra.env
 ```
 
 ## Local env file
@@ -213,17 +273,41 @@ cp .env.example .env
 Current bootstrap variables:
 
 ```env
+MYSQL_PORT=3306
+MYSQL_ROOT_PASSWORD=root
+MYSQL_BUFFER_POOL_SIZE=256M
+MYSQL_CONTAINER_NAME=local-mysql
+
+REDIS_PORT=6379
+REDIS_MAXMEMORY=256mb
+REDIS_CONTAINER_NAME=local-redis
+
+RABBITMQ_PORT=5672
+RABBITMQ_MANAGEMENT_PORT=15672
+RABBITMQ_USER=admin
+RABBITMQ_PASSWORD=admin
+RABBITMQ_MEMORY_WATERMARK=0.2
+RABBITMQ_CONTAINER_NAME=local-rabbitmq
+
+REDPANDA_KAFKA_PORT=9092
+REDPANDA_ADMIN_PORT=9644
+REDPANDA_MEMORY=512M
+REDPANDA_CONTAINER_NAME=local-redpanda
+
+MONGO_PORT=27017
+MONGO_ROOT_USER=admin
+MONGO_ROOT_PASSWORD=admin
+MONGO_CACHE_SIZE=0.25
+MONGO_CONTAINER_NAME=local-mongodb
+MONGO_APP_DB=blog
+
+INFRA_NETWORK_NAME=infra_default
+
 BLOG_DB_NAME=blog_db
 HR_DB_NAME=hr_db
 
 DEV_DB_USER=devuser
 DEV_DB_PASSWORD=changeme
-
-REDPANDA_MEMORY=512M
-
-MONGO_ROOT_USER=admin
-MONGO_ROOT_PASSWORD=admin
-MONGO_CACHE_SIZE=0.25
 ```
 
 `MYSQL_ROOT_PASSWORD` and `MONGO_ROOT_PASSWORD` are used for container bootstrap.
@@ -241,6 +325,7 @@ services:
 networks:
   infra_default:
     external: true
+    name: infra_default
 ```
 
 ## Example application database URL

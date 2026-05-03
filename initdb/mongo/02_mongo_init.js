@@ -1,7 +1,10 @@
-db = db.getSiblingDB('blog');
+const appDbName = process.env.MONGO_APP_DB || 'blog';
+const appUser = process.env.DEV_DB_USER || 'devuser';
+const appPassword = process.env.DEV_DB_PASSWORD || 'changeme';
+const appDb = db.getSiblingDB(appDbName);
 
-db.createUser({
-  user: 'devuser',
-  pwd: 'devpass3992',
-  roles: [{ role: 'readWrite', db: 'blog' }],
+appDb.createUser({
+  user: appUser,
+  pwd: appPassword,
+  roles: [{ role: 'readWrite', db: appDbName }],
 });
