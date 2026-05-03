@@ -1,5 +1,12 @@
 .env
 .env.local
-.claude
-.omx
-.codex
+.env.*.local
+
+.agents/
+.claude/
+.codex/
+.codex-tmp/
+.omx/
+
+*.log
+agent-events.jsonl
