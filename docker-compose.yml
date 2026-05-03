@@ -1,14 +1,18 @@
 services:
   mysql:
     image: mysql:8.4
-    container_name: local-mysql
+    container_name: ${MYSQL_CONTAINER_NAME:-local-mysql}
     restart: unless-stopped
     profiles: ['mysql', 'full']
     ports:
-      - '3306:3306'
+      - '${MYSQL_PORT:-3306}:3306'
     command: --innodb-buffer-pool-size=${MYSQL_BUFFER_POOL_SIZE:-256M}
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      BLOG_DB_NAME: ${BLOG_DB_NAME:-blog_db}
+      HR_DB_NAME: ${HR_DB_NAME:-hr_db}
+      DEV_DB_USER: ${DEV_DB_USER:-devuser}
+      DEV_DB_PASSWORD: ${DEV_DB_PASSWORD:-changeme}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./initdb/mysql:/docker-entrypoint-initdb.d
@@ -33,11 +37,11 @@ services:
 
   redis:
     image: redis:8.6-alpine
-    container_name: local-redis
+    container_name: ${REDIS_CONTAINER_NAME:-local-redis}
     restart: unless-stopped
     profiles: ['redis', 'full']
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT:-6379}:6379'
     command: redis-server --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -51,12 +55,12 @@ services:
 
   rabbitmq:
     image: rabbitmq:4.2-management
-    container_name: local-rabbitmq
+    container_name: ${RABBITMQ_CONTAINER_NAME:-local-rabbitmq}
     restart: unless-stopped
     profiles: ['rabbitmq', 'full']
     ports:
-      - '5672:5672'
-      - '15672:15672'
+      - '${RABBITMQ_PORT:-5672}:5672'
+      - '${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin}
@@ -74,12 +78,12 @@ services:
 
   redpanda:
     image: redpandadata/redpanda:v25.2.7
-    container_name: local-redpanda
+    container_name: ${REDPANDA_CONTAINER_NAME:-local-redpanda}
     restart: unless-stopped
     profiles: ['redpanda', 'full']
     ports:
-      - '9092:9092'
-      - '9644:9644'
+      - '${REDPANDA_KAFKA_PORT:-9092}:9092'
+      - '${REDPANDA_ADMIN_PORT:-9644}:9644'
     command:
       - redpanda
       - start
@@ -96,7 +100,7 @@ services:
       - --kafka-addr
       - PLAINTEXT://0.0.0.0:9092
       - --advertise-kafka-addr
-      - PLAINTEXT://localhost:9092
+      - ${REDPANDA_ADVERTISE_KAFKA_ADDR:-PLAINTEXT://${REDPANDA_CONTAINER_NAME:-local-redpanda}:9092}
     volumes:
       - redpanda_data:/var/lib/redpanda/data
     healthcheck:
@@ -110,15 +114,18 @@ services:
 
   mongodb:
     image: mongo:8.2
-    container_name: local-mongodb
+    container_name: ${MONGO_CONTAINER_NAME:-local-mongodb}
     restart: unless-stopped
     profiles: ['mongodb', 'full']
     ports:
-      - '27017:27017'
+      - '${MONGO_PORT:-27017}:27017'
     command: mongod --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE:-0.25}
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin}
+      MONGO_APP_DB: ${MONGO_APP_DB:-blog}
+      DEV_DB_USER: ${DEV_DB_USER:-devuser}
+      DEV_DB_PASSWORD: ${DEV_DB_PASSWORD:-changeme}
     volumes:
       - mongodb_data:/data/db
       - ./initdb/mongo:/docker-entrypoint-initdb.d:ro
@@ -140,5 +147,5 @@ volumes:
 
 networks:
   infra_default:
-    name: infra_default
+    name: ${INFRA_NETWORK_NAME:-infra_default}
     driver: bridge
